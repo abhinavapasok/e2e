@@ -98,16 +98,17 @@ async function setChecked(target: ActionTarget, checked: boolean, operation: Con
 const UNRENDERED = 'the control and its labels are not visible';
 
 /**
- * Runs in the page. A component library (Element Plus) hides a native
- * checkbox or radio under its label's styled spans with `z-index: -1`, or
- * gives it no box at all, and `sr-only` shrinks it to a clipped pixel, so
- * Playwright refuses the input itself (`<span> intercepts pointer events`,
- * `element is not visible`) though a user's click there reaches it through
- * the label. Returns that label, or null to click the control itself. The
- * choice reads the control and its labels only, past anything else on top (a
- * loading mask, a modal): Playwright's checks on the label wait that out, or
- * fail on it. Throws `UNRENDERED` while none of them is rendered (a dialog
- * not open yet), since nothing tells the two apart then.
+ * Runs in the page. Returns the label to click in place of a checkbox or
+ * radio that a click cannot reach at its own centre, or null to click the
+ * control itself. Element Plus hides the native input under its label's
+ * styled spans with `z-index: -1` or gives it no box, and `sr-only` clips it,
+ * so Playwright refuses the input (`<span> intercepts pointer events`,
+ * `element is not visible`) though a user's click reaches it through the
+ * label. A label with a link or other control at the point is never chosen.
+ * The choice reads the control and its labels only, past anything else on
+ * top (a loading mask, a modal), which Playwright's checks on the label then
+ * wait out or fail on. Throws `UNRENDERED` while no label can be hit yet (a
+ * dialog not open, or not taking pointer events), so the read is retried.
  */
 function pickStandIn(node: Element, unrendered: string): HTMLLabelElement | null {
   if (!(node instanceof HTMLInputElement) || (node.type !== 'checkbox' && node.type !== 'radio') || node.matches(':disabled')) {
@@ -139,18 +140,16 @@ function pickStandIn(node: Element, unrendered: string): HTMLLabelElement | null
   node.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   const box = node.getBoundingClientRect();
   if (!hasBox(box)) return labelAtCentre(false);
-  const pixel = box.width <= 1 && box.height <= 1;
   const [x, y] = centre(box);
-  const hit = topmost(x, y);
-  if (hit === undefined) {
-    if (pixel) return labelAtCentre(true);
-    throw new Error(unrendered);
+  const hits = root.elementsFromPoint(x, y);
+  const hit = hits.find((each) => each === node || labels.some((label) => label.contains(each)));
+  const label = hit === undefined ? undefined : labels.find((own) => own.contains(hit));
+  if (label !== undefined && !pressesInteractive(label, hit)) {
+    const outer = label.getBoundingClientRect();
+    if (x >= outer.left && x <= outer.right && y >= outer.top && y <= outer.bottom) return label;
   }
-  const label = labels.find((own) => own.contains(hit));
-  if (label === undefined || pressesInteractive(label, hit)) return null;
-  const outer = label.getBoundingClientRect();
-  if (x >= outer.left && x <= outer.right && y >= outer.top && y <= outer.bottom) return label;
-  return pixel ? labelAtCentre(true) : null;
+  if (!hits.includes(node)) return labelAtCentre(true);
+  return null;
 }
 
 /**

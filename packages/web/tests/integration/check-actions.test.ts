@@ -409,6 +409,37 @@ describe.each(KINDS)('a control its own label covers, through the %s target', (k
     }
   });
 
+  it.each([
+    ['in a page zoomed to 2', 'zoom:2', 'width:1px;height:1px'],
+    ['in a page scaled by 2', 'transform:scale(2);transform-origin:0 0', 'width:1px;height:1px'],
+  ])('checks and taps a visually hidden checkbox %s through its label', async (_, page_, size) => {
+    for (const action of [{ kind: 'check' }, { kind: 'tap' }] as const) {
+      await page.setContent(`<div style="${page_}"><label style="display:inline-flex;gap:8px"><input type="checkbox" id="c"
+        style="position:absolute;${size};margin:-1px;overflow:hidden;clip:rect(0,0,0,0)"><span>Agree</span></label></div>`);
+      expect(await perform(await targetOf(kind, '#c'), action)).toBeUndefined();
+      expect(await page.isChecked('#c')).toBe(true);
+    }
+  });
+
+  it('checks a Tailwind sr-only checkbox through a label set apart from it, at the label centre', async () => {
+    for (const action of [{ kind: 'check' }, { kind: 'tap' }] as const) {
+      await page.setContent(`<style>.sr-only{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0,0,0,0)}</style>
+        <input type="checkbox" class="sr-only" id="c"><span style="display:inline-block;width:80px"></span><label for="c">Agree</label>`);
+      expect(await perform(await targetOf(kind, '#c'), action)).toBeUndefined();
+      expect(await page.isChecked('#c')).toBe(true);
+    }
+  });
+
+  it('waits for the label of a Tailwind sr-only checkbox to take pointer events, then checks through it', async () => {
+    for (const action of [{ kind: 'check' }, { kind: 'tap' }] as const) {
+      await page.setContent(`<style>.sr-only{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0,0,0,0)}</style>
+        <div id="dialog" style="pointer-events:none"><label style="display:inline-flex;gap:8px"><input type="checkbox" class="sr-only" id="c"><span>Agree</span></label></div>
+        <script>setTimeout(() => document.getElementById('dialog').style.pointerEvents = '', 300)</script>`);
+      expect(await perform(await targetOf(kind, '#c'), action)).toBeUndefined();
+      expect(await page.isChecked('#c')).toBe(true);
+    }
+  });
+
   it('checks a boxless checkbox through its first visible label, past a hidden one', async () => {
     await page.setContent(`
       <input type="checkbox" id="c" style="display:none">
