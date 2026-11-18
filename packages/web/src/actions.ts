@@ -97,7 +97,7 @@ async function setChecked(target: ActionTarget, checked: boolean, operation: Con
  */
 const UNRENDERED = 'the control and its labels are not visible';
 
-/** Where to click a stand-in label, relative to the top-left corner of its box. */
+/** Where to click a stand-in label, relative to the top-left corner of its padding box, as Playwright reads `position`. */
 interface StandIn {
   label: HTMLLabelElement;
   position: { x: number; y: number };
@@ -135,7 +135,8 @@ function pickStandIn(node: Element, unrendered: string): StandIn | null {
   const accepts = (label: HTMLLabelElement, hit: Element): boolean => label.contains(hit) && !label.contains(hit.closest(INTERACTIVE));
   const standIn = (label: HTMLLabelElement, x: number, y: number): StandIn => {
     const { left, top } = label.getBoundingClientRect();
-    return { label, position: { x: x - left, y: y - top } };
+    const { borderLeftWidth, borderTopWidth } = getComputedStyle(label);
+    return { label, position: { x: x - left - Number.parseFloat(borderLeftWidth), y: y - top - Number.parseFloat(borderTopWidth) } };
   };
   node.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   const box = node.getBoundingClientRect();

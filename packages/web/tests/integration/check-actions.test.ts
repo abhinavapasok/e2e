@@ -386,6 +386,20 @@ describe.each(KINDS)('a control its own label covers, through the %s target', (k
     }
   });
 
+  it('checks a Tailwind sr-only checkbox through a bordered label at its own centre, not past the border onto a link', async () => {
+    await page.setContent(`<style>.sr-only{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0,0,0,0)}</style>
+      <label style="position:relative;display:inline-block;border-left:60px solid #ccc"><span style="display:inline-block;width:60px">Accept</span><a
+        href="#went">Terms</a><input type="checkbox" class="sr-only" id="c" style="left:20px;top:8px"></label>`);
+    for (const action of [{ kind: 'check' }, { kind: 'tap' }] as const) {
+      await page.evaluate(() => {
+        (document.getElementById('c') as HTMLInputElement).checked = false;
+      });
+      expect(await perform(await targetOf(kind, '#c'), action)).toBeUndefined();
+      expect(await page.isChecked('#c')).toBe(true);
+      expect(page.url()).not.toContain('#went');
+    }
+  });
+
   it('checks a Tailwind sr-only checkbox through a label that wraps, whose box centre falls between its lines', async () => {
     await page.setContent(`<style>.sr-only{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0,0,0,0)}</style>
       <div style="width:200px;font:16px monospace">aaaaaaaaaaaaaaaaa <label><input type="checkbox" class="sr-only" id="c">ab cdefghijk</label></div>`);
